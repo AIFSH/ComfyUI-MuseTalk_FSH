@@ -1,0 +1,7 @@
+opencv-python
+ffmpeg-python
+soundfile
+diffusers
+pydub
+moviepy
+accelerate
