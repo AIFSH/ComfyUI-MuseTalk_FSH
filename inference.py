@@ -30,10 +30,10 @@ class MuseTalk_INFER:
         self.batch_size_fa = batch_size_fa
         self.use_saved_coord = use_saved_coord
         self.device = torch.device("cuda" if cuda_malloc_supported() else "cpu")
-        config_file = os.path.join(parent_directory,"musetalk/utils/dwpose/rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")
-        checkpoint_file = os.path.join(parent_directory,'models/dwpose/dw-ll_ucoco_384.pth')
-        resnet_path = os.path.join(parent_directory,'models/face-parse-bisent/resnet18-5c106cde.pth')
-        face_model_pth = os.path.join(parent_directory,"models/face-parse-bisent/79999_iter.pth")
+        config_file = os.path.join(parent_directory,"musetalk","utils","dwpose","rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")
+        checkpoint_file = os.path.join(parent_directory,'models','dwpose','dw-ll_ucoco_384.pth')
+        resnet_path = os.path.join(parent_directory,'models','face-parse-bisent','resnet18-5c106cde.pth')
+        face_model_pth = os.path.join(parent_directory,"models','face-parse-bisent','79999_iter.pth")
         self.fp_model = FaceParsing(resnet_path,face_model_pth)
         self.dwpose_model = init_model(config_file, checkpoint_file, device=self.device)
         self.audio_processor,self.vae,self.unet,self.pe  = load_all_model(os.path.join(parent_directory,"models"))
@@ -52,7 +52,8 @@ class MuseTalk_INFER:
         if get_file_type(video_path)=="video":
             save_dir_full = os.path.join(out_path,"musetalk_result",input_basename)
             os.makedirs(save_dir_full,exist_ok = True)
-            cmd = f"ffmpeg -v fatal -i {video_path} -start_number 0 {save_dir_full}/%08d.png"
+            png_path = os.path.join(save_dir_full,"%08d.png")
+            cmd = f"ffmpeg -v fatal -i {video_path} -start_number 0 {png_path}"
             os.system(cmd)
             input_img_list = sorted(glob.glob(os.path.join(save_dir_full, '*.[jpJP][pnPN]*[gG]')))
             fps = get_video_fps(video_path)
@@ -121,9 +122,10 @@ class MuseTalk_INFER:
                 continue
             
             combine_frame = get_image(self.fp_model, ori_frame,res_frame,bbox)
-            cv2.imwrite(f"{result_img_save_path}/{str(i).zfill(8)}.png",combine_frame)
-            
-        cmd_img2video = f"ffmpeg -y -v fatal -r {fps} -f image2 -i {result_img_save_path}/%08d.png -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {output_vid_name}"
+            cv2.imwrite(os.path.join(result_img_save_path,f"{str(i).zfill(8)}.png"),combine_frame)
+
+        res_tmp_path = os.path.join(result_img_save_path,"%08d.png")
+        cmd_img2video = f"ffmpeg -y -v fatal -r {fps} -f image2 -i {res_tmp_path} -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {output_vid_name}"
         print(cmd_img2video)
         os.system(cmd_img2video)
         '''
