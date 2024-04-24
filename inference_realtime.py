@@ -1,4 +1,3 @@
-
 import os
 import sys
 import cv2
@@ -14,13 +13,13 @@ import numpy as np
 import folder_paths
 from cuda_malloc import cuda_malloc_supported
 from typing import Any
+from .musetalk.utils.face_parsing import FaceParsing
+from mmpose.apis import init_model
 from .musetalk.utils.utils import load_all_model,datagen
 from .musetalk.utils.preprocessing import read_imgs,get_landmark_and_bbox
 from .musetalk.utils.blending import get_image,get_image_prepare_material,get_image_blending
 
 parent_directory = os.path.dirname(os.path.abspath(__file__))
-# load model weights
-audio_processor,vae,unet,pe  = load_all_model(os.path.join(parent_directory,"models"))
 device = torch.device("cuda" if cuda_malloc_supported() else "cpu")
 timesteps = torch.tensor([0], device=device)
 
@@ -67,6 +66,15 @@ class Avatar:
         self.preparation = preparation
         self.batch_size = batch_size
         self.idx = 0
+        # load model weights
+        config_file = os.path.join(parent_directory,"musetalk/utils/dwpose/rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")
+        checkpoint_file = os.path.join(parent_directory,'models/dwpose/dw-ll_ucoco_384.pth')
+        resnet_path = os.path.join(parent_directory,'models/face-parse-bisent/resnet18-5c106cde.pth')
+        face_model_pth = os.path.join(parent_directory,"models/face-parse-bisent/79999_iter.pth")
+        if preparation:
+            self.fp_model = FaceParsing(resnet_path,face_model_pth)
+            self.dwpose_model = init_model(config_file, checkpoint_file, device=device)
+        self.audio_processor,self.vae,self.unet,self.pe  = load_all_model(os.path.join(parent_directory,"models"))
         self.init()
         
     def init(self):
@@ -125,7 +133,10 @@ class Avatar:
                 input_mask_list = glob.glob(os.path.join(self.mask_out_path, '*.[jpJP][pnPN]*[gG]'))
                 input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
                 self.mask_list_cycle = read_imgs(input_mask_list)
-    
+        if self.preparation:
+            del self.dwpose_model,self.fp_model
+            import gc; gc.collect(); torch.cuda.empty_cache(); 
+        
     def prepare_material(self):
         print("preparing data materials ... ...")
         with open(self.avatar_info_path, "w") as f:
@@ -143,7 +154,7 @@ class Avatar:
         input_img_list = sorted(glob.glob(os.path.join(self.full_imgs_path, '*.[jpJP][pnPN]*[gG]')))
         
         print("extracting landmarks...")
-        coord_list, frame_list = get_landmark_and_bbox(input_img_list, self.bbox_shift)
+        coord_list, frame_list = get_landmark_and_bbox(self.dwpose_model,input_img_list,1,self.bbox_shift,)
         input_latent_list = []
         idx = -1
         # maker if the bbox is not sufficient 
@@ -155,7 +166,7 @@ class Avatar:
             x1, y1, x2, y2 = bbox
             crop_frame = frame[y1:y2, x1:x2]
             resized_crop_frame = cv2.resize(crop_frame,(256,256),interpolation = cv2.INTER_LANCZOS4)
-            latents = vae.get_latents_for_unet(resized_crop_frame)
+            latents = self.vae.get_latents_for_unet(resized_crop_frame)
             input_latent_list.append(latents)
 
         self.frame_list_cycle = frame_list + frame_list[::-1]
@@ -168,7 +179,7 @@ class Avatar:
             cv2.imwrite(f"{self.full_imgs_path}/{str(i).zfill(8)}.png",frame)
             
             face_box = self.coord_list_cycle[i]
-            mask,crop_box = get_image_prepare_material(frame,face_box)
+            mask,crop_box = get_image_prepare_material(self.fp_model,frame,face_box)
             cv2.imwrite(f"{self.mask_out_path}/{str(i).zfill(8)}.png",mask)
             self.mask_coords_list_cycle += [crop_box]
             self.mask_list_cycle.append(mask)
@@ -178,9 +189,10 @@ class Avatar:
 
         with open(self.coords_path, 'wb') as f:
             pickle.dump(self.coord_list_cycle, f)
-            
+        
         torch.save(self.input_latent_list_cycle, os.path.join(self.latents_out_path)) 
-        #     
+        
+        
         
     def process_frames(self, res_frame_queue,video_len):
         print(video_len)
@@ -213,8 +225,8 @@ class Avatar:
     def inference(self, audio_path, out_vid_name, fps):
         os.makedirs(self.avatar_path+'/tmp',exist_ok =True)   
         ############################################## extract audio feature ##############################################
-        whisper_feature = audio_processor.audio2feat(audio_path)
-        whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
+        whisper_feature = self.audio_processor.audio2feat(audio_path)
+        whisper_chunks = self.audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
         ############################################## inference batch by batch ##############################################
         video_num = len(whisper_chunks)   
         print("start inference")
@@ -232,11 +244,11 @@ class Avatar:
         for i, (whisper_batch,latent_batch) in enumerate(tqdm(gen,total=int(np.ceil(float(video_num)/self.batch_size)))):
             start_time = time.time()
             tensor_list = [torch.FloatTensor(arr) for arr in whisper_batch]
-            audio_feature_batch = torch.stack(tensor_list).to(unet.device) # torch, B, 5*N,384
-            audio_feature_batch = pe(audio_feature_batch)
+            audio_feature_batch = torch.stack(tensor_list).to(self.unet.device) # torch, B, 5*N,384
+            audio_feature_batch = self.pe(audio_feature_batch)
             
-            pred_latents = unet.model(latent_batch, timesteps, encoder_hidden_states=audio_feature_batch).sample
-            recon = vae.decode_latents(pred_latents)
+            pred_latents = self.unet.model(latent_batch, timesteps, encoder_hidden_states=audio_feature_batch).sample
+            recon = self.vae.decode_latents(pred_latents)
             for res_frame in recon:
                 res_frame_queue.put(res_frame)
         # Close the queue and sub-thread after all tasks are completed
@@ -256,6 +268,8 @@ class Avatar:
             os.remove(f"{self.avatar_path}/temp.mp4")
             shutil.rmtree(f"{self.avatar_path}/tmp")
             print(f"result is save to {output_vid}")
+            del self.audio_processor,self.vae,self.unet,self.pe
+            import gc; gc.collect(); torch.cuda.empty_cache(); 
         return output_vid
 
 class Infer_Real_Time:
@@ -273,5 +287,5 @@ class Infer_Real_Time:
             bbox_shift = bbox_shift, 
             batch_size = batch_size,
             preparation= preparation)
-        output_name = os.path.basename(audio_path)[:-4]
+        output_name = os.path.basename(audio_path)[:-4] + "musetalk"
         return avatar.inference(audio_path,output_name,fps)

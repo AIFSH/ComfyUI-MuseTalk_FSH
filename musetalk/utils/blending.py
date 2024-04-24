@@ -56,7 +56,7 @@ def get_image(fp_model,image,face,face_box,upper_boundary_ratio = 0.5,expand=1.2
     body = np.array(body)
     return body[:,:,::-1]
 
-def get_image_prepare_material(image,face_box,upper_boundary_ratio = 0.5,expand=1.2):
+def get_image_prepare_material(fp_model,image,face_box,upper_boundary_ratio = 0.5,expand=1.2):
     body = Image.fromarray(image[:,:,::-1])
 
     x, y, x1, y1 = face_box
@@ -67,7 +67,7 @@ def get_image_prepare_material(image,face_box,upper_boundary_ratio = 0.5,expand=
     face_large = body.crop(crop_box)
     ori_shape = face_large.size
 
-    mask_image = face_seg(face_large)
+    mask_image = face_seg(fp_model,face_large)
     mask_small = mask_image.crop((x-x_s, y-y_s, x1-x_s, y1-y_s))
     mask_image = Image.new('L', ori_shape, 0)
     mask_image.paste(mask_small, (x-x_s, y-y_s, x1-x_s, y1-y_s))
