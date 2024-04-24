@@ -51,13 +51,13 @@ class Avatar:
         self.video_path = video_path
         self.bbox_shift = bbox_shift
         self.avatar_path = os.path.join(musetalk_out_path,avatar_id)
-        self.full_imgs_path = f"{self.avatar_path}/full_imgs" 
-        self.coords_path = f"{self.avatar_path}/coords.pkl"
-        self.latents_out_path= f"{self.avatar_path}/latents.pt"
+        self.full_imgs_path = os.path.join(self.avatar_path, "full_imgs")
+        self.coords_path = os.path.join(self.avatar_path, "coords.pkl")
+        self.latents_out_path= os.path.join(self.avatar_path, "latents.pt")
         self.video_out_path = output_path
-        self.mask_out_path =f"{self.avatar_path}/mask"
-        self.mask_coords_path =f"{self.avatar_path}/mask_coords.pkl"
-        self.avatar_info_path = f"{self.avatar_path}/avator_info.json"
+        self.mask_out_path = os.path.join(self.avatar_path, "mask")
+        self.mask_coords_path = os.path.join(self.avatar_path, "mask_coords.pkl")
+        self.avatar_info_path = os.path.join(self.avatar_path, "avator_info.json")
         self.avatar_info = {
             "avatar_id":avatar_id,
             "video_path":video_path,
@@ -67,10 +67,10 @@ class Avatar:
         self.batch_size = batch_size
         self.idx = 0
         # load model weights
-        config_file = os.path.join(parent_directory,"musetalk/utils/dwpose/rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")
-        checkpoint_file = os.path.join(parent_directory,'models/dwpose/dw-ll_ucoco_384.pth')
-        resnet_path = os.path.join(parent_directory,'models/face-parse-bisent/resnet18-5c106cde.pth')
-        face_model_pth = os.path.join(parent_directory,"models/face-parse-bisent/79999_iter.pth")
+        config_file = os.path.join(parent_directory,"musetalk","utils","dwpose","rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py")
+        checkpoint_file = os.path.join(parent_directory,"models",'dwpose','dw-ll_ucoco_384.pth')
+        resnet_path = os.path.join(parent_directory,'models','face-parse-bisent','resnet18-5c106cde.pth')
+        face_model_pth = os.path.join(parent_directory,'models','face-parse-bisent',"79999_iter.pth")
         if preparation:
             self.fp_model = FaceParsing(resnet_path,face_model_pth)
             self.dwpose_model = init_model(config_file, checkpoint_file, device=device)
@@ -150,7 +150,7 @@ class Avatar:
             files.sort()
             files = [file for file in files if file.split(".")[-1]=="png"]
             for filename in files:
-                shutil.copyfile(f"{self.video_path}/{filename}", f"{self.full_imgs_path}/{filename}")
+                shutil.copyfile(os.path.join(self.video_path,filename), os.path.join(self.full_imgs_path,filename))
         input_img_list = sorted(glob.glob(os.path.join(self.full_imgs_path, '*.[jpJP][pnPN]*[gG]')))
         
         print("extracting landmarks...")
@@ -176,11 +176,11 @@ class Avatar:
         self.mask_list_cycle = []
 
         for i,frame in enumerate(tqdm(self.frame_list_cycle)):
-            cv2.imwrite(f"{self.full_imgs_path}/{str(i).zfill(8)}.png",frame)
+            cv2.imwrite(os.path.join(self.full_imgs_path,str(i).zfill(8)+".png"),frame)
             
             face_box = self.coord_list_cycle[i]
             mask,crop_box = get_image_prepare_material(self.fp_model,frame,face_box)
-            cv2.imwrite(f"{self.mask_out_path}/{str(i).zfill(8)}.png",mask)
+            cv2.imwrite(os.path.join(self.mask_out_path,str(i).zfill(8)+".png"),mask)
             self.mask_coords_list_cycle += [crop_box]
             self.mask_list_cycle.append(mask)
             
@@ -219,11 +219,11 @@ class Avatar:
 
             fps = 1/(time.time()-start+1e-6)
             print(f"Displaying the {self.idx}-th frame with FPS: {fps:.2f}")
-            cv2.imwrite(f"{self.avatar_path}/tmp/{str(self.idx).zfill(8)}.png",combine_frame)
+            cv2.imwrite(os.path.join(self.avatar_path,"tmp",str(self.idx).zfill(8)+".png"),combine_frame)
             self.idx = self.idx + 1
 
     def inference(self, audio_path, out_vid_name, fps):
-        os.makedirs(self.avatar_path+'/tmp',exist_ok =True)   
+        os.makedirs(os.path.join(self.avatar_path,'tmp'),exist_ok =True)   
         ############################################## extract audio feature ##############################################
         whisper_feature = self.audio_processor.audio2feat(audio_path)
         whisper_chunks = self.audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
@@ -256,17 +256,19 @@ class Avatar:
         
         if out_vid_name is not None: 
             # optional
-            cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {self.avatar_path}/tmp/%08d.png -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {self.avatar_path}/temp.mp4"
+            img_path = os.path.join(self.avatar_path,'tmp','%08d.png')
+            tmp_mp4 = os.path.join(self.avatar_path,"temp.mp4")
+            cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {img_path} -vcodec libx264 -vf format=rgb24,scale=out_color_matrix=bt709,format=yuv420p -crf 18 {tmp_mp4}"
             print(cmd_img2video)
             os.system(cmd_img2video)
 
             output_vid = os.path.join(self.video_out_path, out_vid_name+".mp4") # on
-            cmd_combine_audio = f"ffmpeg -y -v warning -i {audio_path} -i {self.avatar_path}/temp.mp4 {output_vid}"
+            cmd_combine_audio = f"ffmpeg -y -v warning -i {audio_path} -i {tmp_mp4} {output_vid}"
             print(cmd_combine_audio)
             os.system(cmd_combine_audio)
 
-            os.remove(f"{self.avatar_path}/temp.mp4")
-            shutil.rmtree(f"{self.avatar_path}/tmp")
+            os.remove(tmp_mp4)
+            shutil.rmtree(os.path.join(self.avatar_path,"tmp"))
             print(f"result is save to {output_vid}")
             del self.audio_processor,self.vae,self.unet,self.pe
             import gc; gc.collect(); torch.cuda.empty_cache(); 
