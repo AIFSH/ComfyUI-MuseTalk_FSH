@@ -1,12 +1,53 @@
 import os
 import folder_paths
 from .inference import MuseTalk_INFER
+from .inference_realtime import Infer_Real_Time
 from pydub import AudioSegment
 from moviepy.editor import VideoFileClip,AudioFileClip
 
 parent_directory = os.path.dirname(os.path.abspath(__file__))
 input_path = folder_paths.get_input_directory()
 out_path = folder_paths.get_output_directory()
+
+class MuseTalkRealTime:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{
+                "audio":("AUDIO",),
+                "video":("VIDEO",),
+                "avatar_id":("STRING",{
+                    "default": "talker1"
+                }),
+                "bbox_shift":("INT",{
+                    "default":0
+                }),
+                "fps":("INT",{
+                    "default":25
+                }),
+                "batch_size":("INT",{
+                    "default":4
+                }),
+                "preparation":("BOOLEAN",{
+                    "default":True
+                })
+            }
+        }
+    CATEGORY = "AIFSH_MuseTalk"
+    DESCRIPTION = "hello world!"
+
+    RETURN_TYPES = ("VIDEO",)
+
+    OUTPUT_NODE = False
+
+    FUNCTION = "process"
+
+    def process(self,audio,video,avatar_id,bbox_shift,fps,batch_size,preparation):
+        muse_talk_real_time = Infer_Real_Time()
+        output_vid_name = muse_talk_real_time(audio, video,avatar_id,fps=fps,batch_size=batch_size,
+                 preparation=preparation,bbox_shift=bbox_shift)
+        return (output_vid_name,)
+
 
 class MuseTalk:
     @classmethod
