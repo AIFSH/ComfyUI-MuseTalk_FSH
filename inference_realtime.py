@@ -71,9 +71,9 @@ class Avatar:
         checkpoint_file = os.path.join(parent_directory,"models",'dwpose','dw-ll_ucoco_384.pth')
         resnet_path = os.path.join(parent_directory,'models','face-parse-bisent','resnet18-5c106cde.pth')
         face_model_pth = os.path.join(parent_directory,'models','face-parse-bisent',"79999_iter.pth")
-        if preparation:
-            self.fp_model = FaceParsing(resnet_path,face_model_pth)
-            self.dwpose_model = init_model(config_file, checkpoint_file, device=device)
+        
+        self.fp_model = FaceParsing(resnet_path,face_model_pth)
+        self.dwpose_model = init_model(config_file, checkpoint_file, device=device)
         self.audio_processor,self.vae,self.unet,self.pe  = load_all_model(os.path.join(parent_directory,"models"))
         self.init()
         
@@ -133,9 +133,11 @@ class Avatar:
                 input_mask_list = glob.glob(os.path.join(self.mask_out_path, '*.[jpJP][pnPN]*[gG]'))
                 input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
                 self.mask_list_cycle = read_imgs(input_mask_list)
-        if self.preparation:
+        try:
             del self.dwpose_model,self.fp_model
             import gc; gc.collect(); torch.cuda.empty_cache(); 
+        except:
+            pass
         
     def prepare_material(self):
         print("preparing data materials ... ...")
