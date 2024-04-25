@@ -64,7 +64,9 @@ ComfyUI-MuseTalk_FSH/models/
 ```
 
 ## Tutorial
-todo
+- [Demo on 3060 12GB](https://www.bilibili.com/video/BV1St421w7Qn)
+- [Demo on 4090 24GB](https://www.bilibili.com/video/BV13T42117uM/)
+
 
 ## WeChat Group && Donate
 <div>
