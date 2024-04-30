@@ -143,7 +143,7 @@ function previewVideo(node,file,type){
 }
 
 app.registerExtension({
-	name: "IP_LAP.VideoPreviewer",
+	name: "MuseTalk.VideoPreviewer",
 	async beforeRegisterNodeDef(nodeType, nodeData, app) {
 		if (nodeData?.name == "PreViewVideo") {
 			nodeType.prototype.onExecuted = function (data) {
