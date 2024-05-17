@@ -75,6 +75,9 @@ class Avatar:
         self.fp_model = FaceParsing(resnet_path,face_model_pth)
         self.dwpose_model = init_model(config_file, checkpoint_file, device=device)
         self.audio_processor,self.vae,self.unet,self.pe  = load_all_model(os.path.join(parent_directory,"models"))
+        self.vae.vae = self.vae.vae.half()
+        self.unet.model = self.unet.model.half()
+        self.pe = self.pe.half()
         self.init()
         
     def init(self):
@@ -167,9 +170,11 @@ class Avatar:
                 continue
             x1, y1, x2, y2 = bbox
             crop_frame = frame[y1:y2, x1:x2]
+            
             resized_crop_frame = cv2.resize(crop_frame,(256,256),interpolation = cv2.INTER_LANCZOS4)
             latents = self.vae.get_latents_for_unet(resized_crop_frame)
             input_latent_list.append(latents)
+            
 
         self.frame_list_cycle = frame_list + frame_list[::-1]
         self.coord_list_cycle = coord_list + coord_list[::-1]
