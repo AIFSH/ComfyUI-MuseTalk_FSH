@@ -42,7 +42,7 @@ You can download weights manually as follows:
    - [face-parse-bisent](https://github.com/zllrunning/face-parsing.PyTorch)
    - [resnet18](https://download.pytorch.org/models/resnet18-5c106cde.pth)
 
-或者下载[MuseTalk.zip](https://pan.quark.cn/s/6efa251a2609)，
+或者下载[MuseTalk.zip](https://pan.quark.cn/s/d6e76084ae92)，
 解压后把子文件夹放入`ComfyUI-MuseTalk_FSH/models/`目录
 
 Finally, these weights should be organized in `models` as follows:
