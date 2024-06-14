@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-musetalk_fsh"
+description = "the comfyui custom node of [a/MuseTalk](https://github.com/TMElyralab/MuseTalk) to make audio driven videos!"
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["opencv-python", "ffmpeg-python", "soundfile", "diffusers", "pydub", "moviepy", "accelerate"]
+
+[project.urls]
+Repository = "https://github.com/AIFSH/ComfyUI-MuseTalk_FSH"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-MuseTalk_FSH"
+Icon = ""
